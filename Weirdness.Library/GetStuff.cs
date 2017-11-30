@@ -24,25 +24,29 @@ namespace Weirdness.Library
 
         public override async Task<T> Get<T>(Guid id)
         {
+            // Start our first attempt.
             return await Get<T>(id, 0);
         }
 
-        private async Task<T> Get<T>(Guid id, byte attempt)
+        private async Task<T> Get<T>(Guid id, int attempt)
         {
             try
             {
+                // Make the attempt.
                 return await base.Get<T>(id);
             }
             catch (DocumentClientException ex) when (ex.StatusCode == (HttpStatusCode)429)
             {
+                // Determine if we should retry based on this instances RetryOptions - the wait phase is baked into this method.
                 if (!await this.IsRetriable(attempt))
                     throw;
 
-                return await this.Get<T>(id, ++attempt);
+                // Recursively call this method.
+                return await this.Get<T>(id, attempt++);
             }
         }
 
-        private async Task<bool> IsRetriable(byte attempt)
+        private async Task<bool> IsRetriable(int attempt)
         {
             var aFutherAttemptShouldBeMade = attempt < this.Options.MaxRetries - 1;
 
@@ -58,9 +62,9 @@ namespace Weirdness.Library
 
     public struct RetryOptions
     {
-        public byte MaxRetries { get; }
+        public int MaxRetries { get; }
 
-        public RetryOptions(byte maxRetries)
+        public RetryOptions(int maxRetries)
         {
             MaxRetries = maxRetries;
         }
