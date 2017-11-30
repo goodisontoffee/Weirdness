@@ -24,26 +24,35 @@ namespace Weirdness.Library
 
         public override async Task<T> Get<T>(Guid id)
         {
-            for (byte attempt = 1; attempt <= this.Options.MaxRetries; attempt++)
-            {
-                try
-                {
-                    return await base.Get<T>(id);
-                }
-                catch (DocumentClientException ex) when (ex.StatusCode == (HttpStatusCode)429)
-                {
-                    if (attempt == this.Options.MaxRetries)
-                        throw;
+            return await Get<T>(id, 0);
+        }
 
-                    await this.IncreaseOrWait(attempt);
-                }
+        private async Task<T> Get<T>(Guid id, byte attempt)
+        {
+            try
+            {
+                return await base.Get<T>(id);
+            }
+            catch (DocumentClientException ex) when (ex.StatusCode == (HttpStatusCode)429)
+            {
+                if (!await this.IsRetriable(attempt))
+                    throw;
+
+                return await this.Get<T>(id, ++attempt);
             }
         }
 
-        private async Task IncreaseOrWait(byte attempt)
+        private async Task<bool> IsRetriable(byte attempt)
         {
-            if (attempt < this.Options.MaxRetries)
+            var aFutherAttemptShouldBeMade = attempt < this.Options.MaxRetries - 1;
+
+            if (aFutherAttemptShouldBeMade)
+            {
                 await Task.Delay(50);
+                return true;
+            }
+
+            return false;
         }
     }
 
