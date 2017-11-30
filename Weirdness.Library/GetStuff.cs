@@ -42,7 +42,7 @@ namespace Weirdness.Library
                     throw;
 
                 // Recursively call this method.
-                return await this.Get<T>(id, attempt++);
+                return await this.Get<T>(id, attempt + 1);
             }
         }
 
