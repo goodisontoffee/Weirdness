@@ -1,23 +1,18 @@
-﻿using System;
-using System.Net;
-using System.Threading.Tasks;
-using Microsoft.Azure.Documents;
-
 namespace Weirdness.Library
 {
-    public class GetStuffBase
-    {
-        public virtual async Task<T> Get<T>(Guid id)
-        {
-            return await Task.FromResult(default(T));
-        }
-    }
+    using System;
+    using System.Net;
+    using System.Threading.Tasks;
+    using Microsoft.Azure.Documents;
 
     public class RetriableGetStuff : GetStuffBase
     {
         private RetryOptions Options { get; }
 
-        public RetriableGetStuff(RetryOptions options)
+        public RetriableGetStuff(
+            IDocumentRepository repository,
+            RetryOptions options)
+            : base(repository)
         {
             Options = options;
         }
@@ -25,7 +20,7 @@ namespace Weirdness.Library
         public override async Task<T> Get<T>(Guid id)
         {
             // Start our first attempt.
-            return await Get<T>(id, 0);
+            return await this.Get<T>(id, 0);
         }
 
         private async Task<T> Get<T>(Guid id, int attempt)
@@ -57,16 +52,6 @@ namespace Weirdness.Library
             }
 
             return false;
-        }
-    }
-
-    public struct RetryOptions
-    {
-        public int MaxRetries { get; }
-
-        public RetryOptions(int maxRetries)
-        {
-            MaxRetries = maxRetries;
         }
     }
 }
