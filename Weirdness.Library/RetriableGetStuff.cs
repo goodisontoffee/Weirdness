@@ -19,25 +19,35 @@ namespace Weirdness.Library
 
         public override async Task<T> Get<T>(Guid id)
         {
-            // Start our first attempt.
-            return await this.Get<T>(id, 0);
+            var attemptResult = new RetriableActivity<T>();
+
+            do
+            {
+                attemptResult = await this.Get<T>(id, attemptResult.AttemptsMade);
+            } while (attemptResult.IsRetriable);
+
+            if (attemptResult.WasSuccessful)
+                return attemptResult.Result;
+
+            throw attemptResult.Exception;
         }
 
-        private async Task<T> Get<T>(Guid id, int attempt)
+        private async Task<RetriableActivity<T>> Get<T>(Guid id, int attempt)
         {
             try
             {
                 // Make the attempt.
-                return await base.Get<T>(id);
+                var result = await base.Get<T>(id);
+                return RetriableActivity<T>.Successful(result, attempt + 1);
             }
             catch (DocumentClientException ex) when (ex.StatusCode == (HttpStatusCode)429)
             {
                 // Determine if we should retry based on this instances RetryOptions - the wait phase is baked into this method.
                 if (!await this.IsRetriable(attempt))
-                    throw;
+                    return RetriableActivity<T>.Failure(ex, attempt + 1);
 
                 // Recursively call this method.
-                return await this.Get<T>(id, attempt + 1);
+                return RetriableActivity<T>.Retriable(ex, attempt + 1);
             }
         }
 
